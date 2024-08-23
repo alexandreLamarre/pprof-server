@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/alexandreLamarre/pprof-server/pkg/server"
@@ -15,12 +16,18 @@ import (
 )
 
 func BuildPprofServer() *cobra.Command {
-	var listenAddr string
+	var grpcAddr string
+	var httpAddr string
 	cmd := &cobra.Command{
 		Use: "pprofserver",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			listener, err := net.Listen("tcp4", listenAddr)
+			gListener, err := net.Listen("tcp4", grpcAddr)
+			if err != nil {
+				return err
+			}
+
+			hListener, err := net.Listen("tcp", httpAddr)
 			if err != nil {
 				return err
 			}
@@ -41,22 +48,36 @@ func BuildPprofServer() *cobra.Command {
 
 			grpcServer.RegisterService(&collogspb.LogsService_ServiceDesc, pprofServer)
 
-			errC := lo.Async(func() error {
-				logrus.Infof("Pprof server listening on %s....", listenAddr)
-				return grpcServer.Serve(listener)
+			errGC := lo.Async(func() error {
+				logrus.Infof("Pprof gRPC server listening on %s....", grpcAddr)
+				return grpcServer.Serve(gListener)
+			})
+			var httpServer *http.Server
+			errHC := lo.Async(func() error {
+				logrus.Infof("Http UI server listening on %s...", httpAddr)
+				s := pprofServer.HttpServer()
+				httpServer = s
+				return s.Serve(hListener)
 			})
 
 			select {
 			case <-cmd.Context().Done():
+				httpServer.Shutdown(cmd.Context())
 				grpcServer.GracefulStop()
 				return nil
-			case err := <-errC:
+			case err := <-errHC:
+				logrus.Errorf("HTTP server error: %v", err)
+				grpcServer.GracefulStop()
+				return err
+			case err := <-errGC:
+				httpServer.Shutdown(cmd.Context())
+				logrus.Errorf("GRPC server error: %v", err)
 				return err
 			}
 		},
 	}
-
-	cmd.Flags().StringVar(&listenAddr, "listen-addr", ":10001", "The address to listen on for GRPC requests.")
+	cmd.Flags().StringVarP(&httpAddr, "http-addr", "a", ":10000", "The address to listen on for HTTP requests.")
+	cmd.Flags().StringVarP(&grpcAddr, "grpc-addr", "g", ":10001", "The address to listen on for GRPC requests.")
 	return cmd
 }
 
