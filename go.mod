@@ -4,7 +4,7 @@ go 1.23.0
 
 replace github.com/alexandreLamarre/otelbpf/receiver/pprofreceiver => github.com/alexandreLamarre/otelcol-bpf/receiver/pprofreceiver v0.0.0-20240822220648-dbccb34e2f62
 
-replace github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 => github.com/alexandreLamarre/pprof v0.0.0-20240823000903-9c0b95314838
+replace github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 => /home/alex/repos/otel/pprof
 
 require (
 	github.com/alexandreLamarre/otelbpf/receiver/pprofreceiver v0.0.0-20240822220648-dbccb34e2f62
